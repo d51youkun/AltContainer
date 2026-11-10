@@ -252,13 +252,32 @@ struct LCAppListView : View, LCAppBannerDelegate, LCAppModelDelegate {
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("lc.appList.openLink".loc, systemImage: "link", action: {
-                        Task { await onOpenWebViewTapped() }
-                    })
+                    Menu {
+                        if LCBundledApps.usesAltStore {
+                            ForEach(1...3, id: \.self) { slot in
+                                Button("lc.altcontainer.account".localizeWithFormat(slot)) {
+                                    LCBundledApps.accountSlot = slot
+                                    LCUtils.openSideStore(delegate: self)
+                                }
+                            }
+                            Divider()
+                        }
+                        Button("lc.appList.openLink".loc, systemImage: "link") {
+                            Task { await onOpenWebViewTapped() }
+                        }
+                    } label: {
+                        Label(LCBundledApps.usesAltStore ? "AltStore" : "lc.appList.openLink".loc, systemImage: "link")
+                    }
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        if LCBundledApps.stikIPA != nil {
+                            Button("StikDebug", systemImage: "ladybug") {
+                                Task { await openBundledStikDebug() }
+                            }
+                            Divider()
+                        }
                         Picker("Sort by", selection: $sharedAppSortManager.appSortType) {
                             ForEach(AppSortType.allCases, id: \.self) { sortType in
                                 Label(sortType.displayName, systemImage: sortType.systemImage)
@@ -484,6 +503,30 @@ struct LCAppListView : View, LCAppBannerDelegate, LCAppModelDelegate {
         await openWebView(urlString: urlToOpen)
         
     }
+    @MainActor
+    func openBundledStikDebug(urlStr: String? = nil) async {
+        do {
+            var model = sharedModel.apps.first { $0.bundleIdentifier == "com.stik.stikdebug" }
+            if model == nil, let ipa = LCBundledApps.stikIPA {
+                guard !installprogressVisible else { return }
+                installprogressVisible = true
+                defer { installprogressVisible = false }
+                try await installIpaFile(ipa)
+                // installIpaFile publishes the model on the next main-queue turn.
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+                model = sharedModel.apps.first { $0.bundleIdentifier == "com.stik.stikdebug" }
+            }
+            guard let model else { return }
+            model.appInfo.selectedLanguage = "ja"
+            try await model.runApp(urlStr: urlStr)
+        } catch {
+            errorInfo = error.localizedDescription
+            errorShow = true
+        }
+    }
+
     func onAppear() {
         for app in sharedModel.apps {
             app.delegate = self
@@ -496,6 +539,16 @@ struct LCAppListView : View, LCAppBannerDelegate, LCAppModelDelegate {
     
     
     func openWebView(urlString: String) async {
+        if let scheme = URLComponents(string: urlString)?.scheme?.lowercased() {
+            if LCBundledApps.usesAltStore && ["altstore", "altstore-classic", "altstore-com.rileytestut.AltStore"].contains(scheme) {
+                LCUtils.openSideStore(delegate: self, urlStr: urlString)
+                return
+            }
+            if LCBundledApps.stikIPA != nil && ["stikdebug", "stikjit"].contains(scheme) {
+                await openBundledStikDebug(urlStr: urlString)
+                return
+            }
+        }
         guard var urlToOpen = URLComponents(string: urlString), urlToOpen.url != nil else {
             errorInfo = "lc.appList.urlInvalidError".loc
             errorShow = true
@@ -1162,6 +1215,14 @@ struct LCAppListView : View, LCAppBannerDelegate, LCAppModelDelegate {
     }
     
     func handleURL(url : URL) {
+        if LCBundledApps.usesAltStore && ["altstore", "altstore-classic", "altstore-com.rileytestut.AltStore"].contains(url.scheme?.lowercased() ?? "") {
+            LCUtils.openSideStore(delegate: self, urlStr: url.absoluteString)
+            return
+        }
+        if LCBundledApps.stikIPA != nil && ["stikdebug", "stikjit"].contains(url.scheme?.lowercased() ?? "") {
+            Task { await openBundledStikDebug(urlStr: url.absoluteString) }
+            return
+        }
         if url.isFileURL {
             Task { await installFromUrl(urlStr: url.absoluteString) }
             return

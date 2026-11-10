@@ -69,7 +69,7 @@ final class BuiltInSideStoreAppInfo : LCAppInfo {
     
     private func ensureAndGetIconCacheFolder() -> URL? {
         let directory = LCPath.docPath
-            .appendingPathComponent("SideStore/Library/Caches", isDirectory: true)
+            .appendingPathComponent(LCBundledApps.usesAltStore ? "AltStore/Library/Caches" : "SideStore/Library/Caches", isDirectory: true)
             .appendingPathComponent("BuiltInSideStoreIconCache", isDirectory: true)
         if !FileManager.default.fileExists(atPath: directory.path) {
             do {

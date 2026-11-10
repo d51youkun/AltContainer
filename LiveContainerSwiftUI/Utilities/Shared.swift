@@ -92,6 +92,10 @@ class SharedModel: ObservableObject {
     var mainWindowOpened = false
     
     public static let keychainAccessGroupCount = 128
+    // The integrated store reserves 125...127 for its three account slots.
+    public static var guestKeychainAccessGroupCount: Int {
+        LCBundledApps.usesAltStore ? 125 : keychainAccessGroupCount
+    }
     
     func updateMultiLCStatus() {
         if LCUtils.appUrlScheme()?.lowercased() != "livecontainer" {

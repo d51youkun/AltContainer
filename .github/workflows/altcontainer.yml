@@ -1,0 +1,112 @@
+name: AltContainer - upstream compatibility build
+
+on:
+  push:
+    branches: [main, 'feat/altcontainer-*']
+  pull_request:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: altcontainer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Resolve official upstream versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/altcontainer/upstream.py --output upstream.json
+      - name: Compare with last successful release
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != schedule ]; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          elif gh release download altcontainer-latest --repo "$REPOSITORY" --pattern upstream.json --dir previous && cmp -s upstream.json previous/upstream.json; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upstream-manifest
+          path: upstream.json
+
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.changed == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream-manifest
+      - name: Test packaging and monitor
+        run: python3 -m unittest discover -s .github/altcontainer/tests -v
+      - name: Download the resolved versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import importlib.util, json
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location('upstream', '.github/altcontainer/upstream.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.download(json.loads(Path('upstream.json').read_text()), Path('upstream'))
+          PY
+      - name: Install packaging tools
+        run: |
+          brew install ldid
+          curl --fail --location --retry 3 https://github.com/LiveContainer/dylibify/releases/download/1.0/dylibify --output dylibify
+          chmod +x dylibify
+      - name: Archive without a distribution identity
+        run: |
+          set -o pipefail
+          xcodebuild archive -project LiveContainer.xcodeproj -scheme LiveContainer -archivePath archive -sdk iphoneos -arch arm64 -configuration Release CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log
+      - name: Package AltContainer
+        run: |
+          python3 .github/altcontainer/package.py --host archive.xcarchive/Products/Applications/LiveContainer.app --altstore upstream/altstore.ipa --stikdebug upstream/stikdebug.ipa --dylibify ./dylibify --output AltContainer+AltStore+StikDebug.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AltContainer-unsigned
+          path: |
+            AltContainer+AltStore+StikDebug.ipa
+            upstream.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AltContainer-build-log
+          path: build.log
+      - name: Publish successful compatibility build
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh release view altcontainer-latest --repo "$REPOSITORY" || gh release create altcontainer-latest --repo "$REPOSITORY" --title 'AltContainer compatibility build' --prerelease --notes 'Unsigned IPA. Requires sideload signing and device testing. Guest widgets and cross-account extension signing are not supported. New upstream versions are build candidates, not a guarantee of runtime compatibility.'
+          gh release upload altcontainer-latest 'AltContainer+AltStore+StikDebug.ipa' upstream.json --repo "$REPOSITORY" --clobber
+    permissions:
+      contents: write

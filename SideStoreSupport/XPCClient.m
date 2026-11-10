@@ -34,6 +34,9 @@ void installSideStoreHooks(void);
 
 + (void)load {
     if(!NSUserDefaults.isSideStore) return;
+    // AltStore is loaded through the same bootstrap path, but must never receive
+    // SideStore-only runtime hooks (several selectors do not exist in AltStore).
+    if ([NSUserDefaults.lcMainBundle.infoDictionary[@"LCBuiltInStore"] isEqualToString:@"AltStore"]) return;
     
     installSideStoreHooks();
     

@@ -118,7 +118,7 @@ struct LCAppSettingsView: View {
                         }
                     }
                 }
-                if(model.uiContainers.count < SharedModel.keychainAccessGroupCount) {
+                if(model.uiContainers.count < SharedModel.guestKeychainAccessGroupCount) {
                     Button {
                         Task{ await createFolder() }
                     } label: {
@@ -509,7 +509,7 @@ struct LCAppSettingsView: View {
         let newContainer = LCContainer(folderName: newName, name: displayName, isShared: model.uiIsShared)
         // assign keychain group
         var keychainGroupSet : Set<Int> = Set(minimumCapacity: 3)
-        for i in 0..<SharedModel.keychainAccessGroupCount {
+        for i in 0..<SharedModel.guestKeychainAccessGroupCount {
             keychainGroupSet.insert(i)
         }
         for container in model.uiContainers {
@@ -574,7 +574,7 @@ struct LCAppSettingsView: View {
                 container = LCContainer(infoDict: ["folderName": url.lastPathComponent, "name": url.lastPathComponent, "bookmarkData": bookmark], isShared: false)
                 // assign keychain group
                 var keychainGroupSet : Set<Int> = Set(minimumCapacity: 3)
-                for i in 0..<SharedModel.keychainAccessGroupCount {
+                for i in 0..<SharedModel.guestKeychainAccessGroupCount {
                     keychainGroupSet.insert(i)
                 }
                 for container in model.uiContainers {
@@ -851,7 +851,7 @@ extension LCAppSettingsView : LCContainerViewDelegate {
 
 extension LCAppSettingsView : LCSelectContainerViewDelegate {
     func addContainers(containers: Set<String>) {
-        if containers.count + model.uiContainers.count > SharedModel.keychainAccessGroupCount {
+        if containers.count + model.uiContainers.count > SharedModel.guestKeychainAccessGroupCount {
             errorInfo = "lc.container.tooMuchContainers".loc
             errorShow = true
             return
@@ -862,8 +862,8 @@ extension LCAppSettingsView : LCSelectContainerViewDelegate {
             newContainer.loadName()
             if newContainer.keychainGroupId == -1 {
                 // assign keychain group for old containers
-                var keychainGroupSet : Set<Int> = Set(minimumCapacity: SharedModel.keychainAccessGroupCount)
-                for i in 0..<SharedModel.keychainAccessGroupCount {
+                var keychainGroupSet : Set<Int> = Set(minimumCapacity: SharedModel.guestKeychainAccessGroupCount)
+                for i in 0..<SharedModel.guestKeychainAccessGroupCount {
                     keychainGroupSet.insert(i)
                 }
                 for container in model.uiContainers {

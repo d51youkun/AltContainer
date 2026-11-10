@@ -184,6 +184,11 @@ extension LCAppInfo {
     var containers : [LCContainer] {
         get {
             if self is BuiltInSideStoreAppInfo {
+                if LCBundledApps.usesAltStore {
+                    let container = LCContainer(folderName: "AltStoreAccount\(LCBundledApps.accountSlot)", name: "AltStore", isShared: false)
+                    container.resolvedContainerURL = LCBundledApps.accountHome
+                    return [container]
+                }
                 let container = LCContainer(folderName: "", name: "SideStore", isShared: false)
                 container.resolvedContainerURL = LCPath.docPath.appendingPathComponent("SideStore")
                 return [container]

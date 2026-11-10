@@ -585,7 +585,7 @@ struct LCSettingsView: View {
     func importCertificateFromSideStore() async {
         if UserDefaults.sideStoreExist() {
             if let ans = await certificateImportFromBuiltInSideStoreAlert.open(), ans {
-                let query: [String: Any] = [
+                var query: [String: Any] = [
                     kSecClass as String: kSecClassGenericPassword,
                     kSecAttrAccount as String: "signingCertificate",
                     kSecReturnData as String: true,
@@ -593,6 +593,10 @@ struct LCSettingsView: View {
                     kSecAttrService as String: "com.kdt.livecontainer",
                     kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
                 ]
+                if LCBundledApps.usesAltStore {
+                    query[kSecAttrService as String] = "com.rileytestut.AltStore"
+                    query[kSecAttrAccessGroup as String] = LCBundledApps.keychainAccessGroup
+                }
                 
                 var item: CFTypeRef?
                 let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -614,7 +618,7 @@ struct LCSettingsView: View {
                     return
                 }
                 
-                let passwordQuery: [String: Any] = [
+                var passwordQuery: [String: Any] = [
                     kSecClass as String: kSecClassGenericPassword,
                     kSecAttrAccount as String: "signingCertificatePassword",
                     kSecReturnData as String: true,
@@ -622,6 +626,10 @@ struct LCSettingsView: View {
                     kSecAttrService as String: "com.kdt.livecontainer",
                     kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
                 ]
+                if LCBundledApps.usesAltStore {
+                    passwordQuery[kSecAttrService as String] = "com.rileytestut.AltStore"
+                    passwordQuery[kSecAttrAccessGroup as String] = LCBundledApps.keychainAccessGroup
+                }
                 
                 var passwordItem: CFTypeRef?
                 let passwordStatus = SecItemCopyMatching(passwordQuery as CFDictionary, &passwordItem)

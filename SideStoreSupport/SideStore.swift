@@ -79,6 +79,9 @@ class RefreshHandler: NSObject, RefreshServer {
     static var shared = RefreshHandler()
     
     func startRefresh(identifier: String, mangledName: String) async throws {
+        if UserDefaults.lcMainBundle().object(forInfoDictionaryKey: "LCBuiltInStore") as? String == "AltStore" {
+            throw NSError(domain: "AltContainer", code: 1, userInfo: [NSLocalizedDescriptionKey: "AltStoreの更新はAltStore内のRemote AltServerから実行してください。このSideStore用ショートカットは利用できません。"])
+        }
         if sideStorePid <= 0 || getpgid(sideStorePid) <= 0, let c {
             c.resume(throwing: NSError(domain: "SideStore", code: 1, userInfo: [NSLocalizedDescriptionKey: "Built-in SideStore quit unexpectedly"]))
             self.c = nil

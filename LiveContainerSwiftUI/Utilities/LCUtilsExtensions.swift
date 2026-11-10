@@ -520,7 +520,12 @@ extension LCUtils {
         let sideStoreApp = LCAppModel(appInfo: BuiltInSideStoreAppInfo.shared, delegate: delegate)
         
         Task {
-            try await sideStoreApp.runApp(bundleIdOverride: "builtinSideStore", urlStr: urlStr)
+            if LCBundledApps.usesAltStore {
+                try LCBundledApps.prepareAccount()
+            }
+            // Account selection is host-global. Keep the store in the host
+            // process rather than launching an account in a parallel LiveProcess.
+            try await sideStoreApp.runApp(multitask: LCBundledApps.usesAltStore ? false : nil, bundleIdOverride: "builtinSideStore", urlStr: urlStr)
         }
     }
 }

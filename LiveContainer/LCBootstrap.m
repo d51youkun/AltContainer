@@ -490,7 +490,12 @@ static NSString* invokeAppMain(NSString *selectedApp, NSString *selectedContaine
             newHomePath = [lcUserDefaults stringForKey:@"specifiedSideStoreContainerPath"];;
             [lcUserDefaults removeObjectForKey:@"specifiedSideStoreContainerPath"];
         } else {
-            newHomePath = [docPath stringByAppendingPathComponent:@"SideStore"];
+            if ([lcMainBundle.infoDictionary[@"LCBuiltInStore"] isEqualToString:@"AltStore"]) {
+                NSInteger slot = MIN(3, MAX(1, [lcUserDefaults integerForKey:@"LCAltStoreAccountSlot"]));
+                newHomePath = [docPath stringByAppendingPathComponent:[NSString stringWithFormat:@"AltStore/Account%ld", (long)slot]];
+            } else {
+                newHomePath = [docPath stringByAppendingPathComponent:@"SideStore"];
+            }
         }
     } else if (bookmarkURL) {
         newHomePath = bookmarkURL.path;
@@ -582,7 +587,7 @@ static NSString* invokeAppMain(NSString *selectedApp, NSString *selectedContaine
     if (!isLiveProcess && [guestAppInfo[@"helperProcessesSupport"] boolValue]) {
         NSExtensionGuestHooksInit(appBundle.bundleURL, [NSURL fileURLWithPath:newHomePath isDirectory:YES]);
     }
-    if(!isSideStore) {
+    if(!isSideStore || [lcMainBundle.infoDictionary[@"LCBuiltInStore"] isEqualToString:@"AltStore"]) {
         SecItemGuestHooksInit();
         NSFMGuestHooksInit();
         initDead10ccFix();
