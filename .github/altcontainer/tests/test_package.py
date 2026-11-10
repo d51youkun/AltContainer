@@ -56,5 +56,12 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(upstream.APPS["stikdebug"][0], "StikDebug/StikDebug")
         self.assertEqual(upstream.APPS["altstore"][0], "altstoreio/AltStore")
 
+    def test_three_publication_names(self):
+        workflow = (Path(__file__).parents[2] / "workflows" / "altcontainer.yml").read_text()
+        for name in ["LiveContainer.ipa", "LiveContainer+SideStore.ipa", "AltContainer+StickDebug.ipa"]:
+            self.assertIn(f"name: {name}", workflow)
+        self.assertIn("gh release upload altcontainer-latest LiveContainer.ipa 'LiveContainer+SideStore.ipa' 'AltContainer+StickDebug.ipa'", workflow)
+        self.assertNotIn("AltContainer+AltStore+StikDebug.ipa", workflow)
+
 if __name__ == "__main__":
     unittest.main()

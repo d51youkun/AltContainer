@@ -1,10 +1,15 @@
-# copy lc
-wget https://github.com/LiveContainer/dylibify/releases/download/1.0/dylibify
+#!/bin/bash
+set -euo pipefail
+
+# Work on a copy so other IPA variants can use the original archive.
+if [ ! -f dylibify ]; then
+    curl --fail --location --retry 3 https://github.com/LiveContainer/dylibify/releases/download/1.0/dylibify --output dylibify
+fi
 chmod +x dylibify
-brew install ldid
+command -v ldid >/dev/null || brew install ldid
 
 # move lc to working folder
-mv "$archive_path.xcarchive/Products/Applications" Payload
+cp -R "$archive_path.xcarchive/Products/Applications" Payload
 
 # temporarily move sidestore support framrwork to tmp before zip
 mkdir tmp
@@ -41,7 +46,7 @@ mv ./tmp/SideStoreSupport.framework Payload/LiveContainer.app/Frameworks
 
 # download SideStore
 cd tmp
-wget https://github.com/LiveContainer/SideStore/releases/download/nightly/SideStore.ipa
+curl --fail --location --retry 3 https://github.com/LiveContainer/SideStore/releases/download/nightly/SideStore.ipa --output SideStore.ipa
 unzip SideStore.ipa
 cd ..
 
@@ -67,8 +72,7 @@ mv ./Payload/LiveContainer.app/Frameworks/SideStoreApp.framework/PlugIns/AltWidg
 mv ./Payload/LiveContainer.app/PlugIns/LiveWidgetExtension.appex/AltWidgetExtension ./Payload/LiveContainer.app/PlugIns/LiveWidgetExtension.appex/LiveWidgetExtension
 
 # Sign
-rm -r .zsign_cache
-find payloadlc/Payload -type d -name "_CodeSignature" -exec rm -r {} +
+find Payload -type d -name "_CodeSignature" -prune -exec rm -r {} +
 
 ldid -S.github/sidelc/LiveWidgetExtension_adhoc.xml ./Payload/LiveContainer.app/PlugIns/LiveWidgetExtension.appex/LiveWidgetExtension
 

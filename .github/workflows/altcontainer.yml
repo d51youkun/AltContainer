@@ -7,6 +7,7 @@ on:
   schedule:
     - cron: '23 */6 * * *'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -50,7 +51,7 @@ jobs:
   build:
     needs: resolve
     if: needs.resolve.outputs.changed == 'true'
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,13 +88,39 @@ jobs:
           xcodebuild archive -project LiveContainer.xcodeproj -scheme LiveContainer -archivePath archive -sdk iphoneos -arch arm64 -configuration Release CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log
       - name: Package AltContainer
         run: |
-          python3 .github/altcontainer/package.py --host archive.xcarchive/Products/Applications/LiveContainer.app --altstore upstream/altstore.ipa --stikdebug upstream/stikdebug.ipa --dylibify ./dylibify --output AltContainer+AltStore+StikDebug.ipa
+          python3 .github/altcontainer/package.py --host archive.xcarchive/Products/Applications/LiveContainer.app --altstore upstream/altstore.ipa --stikdebug upstream/stikdebug.ipa --dylibify ./dylibify --output AltContainer+StickDebug.ipa
+      - name: Package LiveContainer and LiveContainer+SideStore
+        env:
+          scheme: LiveContainer
+          archive_path: archive
+        run: bash .github/build_github.sh
+      - name: Verify all three IPA files
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          for name in ['LiveContainer.ipa', 'LiveContainer+SideStore.ipa', 'AltContainer+StickDebug.ipa']:
+              path = Path(name)
+              assert path.is_file() and path.stat().st_size > 0, name
+              with zipfile.ZipFile(path) as archive:
+                  assert archive.testzip() is None, name
+              print('Verified:', name)
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: AltContainer-unsigned
+          name: AltContainer+StickDebug.ipa
           path: |
-            AltContainer+AltStore+StikDebug.ipa
-            upstream.json
+            AltContainer+StickDebug.ipa
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiveContainer.ipa
+          path: LiveContainer.ipa
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiveContainer+SideStore.ipa
+          path: LiveContainer+SideStore.ipa
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
@@ -106,7 +133,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          gh release view altcontainer-latest --repo "$REPOSITORY" || gh release create altcontainer-latest --repo "$REPOSITORY" --title 'AltContainer compatibility build' --prerelease --notes 'Unsigned IPA. Requires sideload signing and device testing. Guest widgets and cross-account extension signing are not supported. New upstream versions are build candidates, not a guarantee of runtime compatibility.'
-          gh release upload altcontainer-latest 'AltContainer+AltStore+StikDebug.ipa' upstream.json --repo "$REPOSITORY" --clobber
+          gh release view altcontainer-latest --repo "$REPOSITORY" || gh release create altcontainer-latest --repo "$REPOSITORY" --title 'LiveContainer / LiveContainer+SideStore / AltContainer+StickDebug' --prerelease --notes 'Three unsigned IPA variants: LiveContainer.ipa (standalone), LiveContainer+SideStore.ipa (built-in SideStore), AltContainer+StickDebug.ipa (built-in AltStore and bundled StikDebug). Requires sideload signing and device testing. Guest widgets and cross-account extension signing are not supported.'
+          gh release upload altcontainer-latest LiveContainer.ipa 'LiveContainer+SideStore.ipa' 'AltContainer+StickDebug.ipa' upstream.json --repo "$REPOSITORY" --clobber
     permissions:
       contents: write

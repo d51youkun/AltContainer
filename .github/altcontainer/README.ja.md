@@ -4,6 +4,18 @@
 最後に公開できたバージョンと異なる場合だけビルドします。失敗時は既存リリースを更新しません。
 IPAは未署名です。自動ビルド成功は実機での互換性を保証しません。
 
+## 配布ファイル
+
+同じアーカイブから次の3ファイルを生成し、すべての生成・ZIP検査が成功した場合に
+デフォルトブランチのビルドから `altcontainer-latest` リリースへ公開します。
+
+- `LiveContainer.ipa`：内蔵ストアなしの単体版。
+- `LiveContainer+SideStore.ipa`：従来のSideStore内蔵版。
+- `AltContainer+StickDebug.ipa`：AltStore内蔵＋StikDebug同梱版。公開名は指定に合わせてStickDebugと表記。
+
+PR・作業ブランチではActionsの成果物のみ保存し、リリースには公開しません。
+自動ビルドは `altcontainer.yml` に一本化し、旧 `Xcode - Build` は手動実行の入口として保持します。
+
 ## 現在の対応範囲
 
 - 元のLiveContainer／SideStoreビルド経路と証明書インポート処理は保持。
